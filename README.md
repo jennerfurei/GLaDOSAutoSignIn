@@ -20,3 +20,4 @@ mac os automatic sign in GLaDos
 	•	系统设置 → 登录项（登录与启动项）→ 打开用户登录项
 	•	点击「+」添加刚刚保存的 Automator 应用
 
+4.测试auto g i t
