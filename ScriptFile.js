@@ -1,128 +1,74 @@
 // ==UserScript==
 // @name         GLaDOS 自动签到（MutationObserver 版）
 // @namespace    http://tampermonkey.net/
-// @version      0.5
-// @description  使用 MutationObserver 等待遮罩消失后自动点击签到
+// @version      0.6
+// @description  等待签到按钮出现后自动点击（排除已签到状态，兼容 Turnstile）
+// @match        https://glados.cloud/console/checkin*
 // @match        https://glados.network/console/checkin*
 // @grant        none
 // @license MIT
 // ==/UserScript==
- 
+
 (function () {
     'use strict';
-   
-    function simulateClick(element) {
-      const evt = new MouseEvent('click', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-      element.dispatchEvent(evt);
+
+    const CLICKED_FLAG = '__glados_checkin_clicked__';
+
+    // 找签到按钮：文本含 签到/checkin/sign in，排除「已签到」和 is-done/disabled 状态
+    function findCheckinButton() {
+        return [...document.querySelectorAll('button')].find(btn => {
+            const text = (btn.innerText || '').toLowerCase();
+            const isDone = btn.classList.contains('is-done') ||
+                           (btn.innerText || '').includes('已签到') ||
+                           text.includes('already') ||
+                           btn.disabled;
+            return (
+                (text.includes('签到') || text.includes('checkin') || text.includes('sign in')) &&
+                !isDone &&
+                btn.offsetParent !== null
+            );
+        });
     }
-   
-    function isHUDVisible() {
-      const hud = document.querySelector('.ant-spin-spinning');
-      return hud && window.getComputedStyle(hud).display !== 'none';
+
+    function doCheckin(button) {
+        // 同一会话只点一次，防止 MutationObserver 多次触发
+        if (window[CLICKED_FLAG]) return;
+        window[CLICKED_FLAG] = true;
+        console.log('✅ 找到可用签到按钮，执行点击');
+        button.click();
     }
-   
-    function tryCheckin() {
-      const button = [...document.querySelectorAll('button')]
-        .find(btn => btn.innerText.includes("签到") || btn.innerText.toLowerCase().includes("checkin"));
-   
-      if (button) {
-        console.log("✅ 找到签到按钮，触发点击");
-        simulateClick(button);
-      } else {
-        console.log("❌ 没找到签到按钮");
-      }
+
+    // MutationObserver：按钮渲染出来就点
+    const observer = new MutationObserver(() => {
+        const button = findCheckinButton();
+        if (button) {
+            observer.disconnect();
+            doCheckin(button);
+        }
+    });
+
+    function start() {
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            characterData: true
+        });
+        // 初始检查（按钮可能已在 DOM 里，等不到 Mutation）
+        setTimeout(() => {
+            const button = findCheckinButton();
+            if (button) {
+                observer.disconnect();
+                doCheckin(button);
+            }
+        }, 2000);
     }
-   
-    function forceCheckIn() {
-  // 强制停止页面加载
-  window.stop();
-  console.log("🛑 已强制停止页面加载");
 
-  // 打印所有按钮的文本和类名（调试用）
-  const buttons = [...document.querySelectorAll('button')];
-  console.log("📋 当前页面按钮列表：", buttons.map(btn => ({
-    text: btn.innerText,
-    class: btn.className,
-    disabled: btn.disabled,
-    visible: btn.offsetParent !== null
-  })));
+    if (document.body) {
+        start();
+    } else {
+        document.addEventListener('DOMContentLoaded', start);
+    }
 
-  // 查找签到按钮（放宽匹配条件）
-  const button = buttons.find(btn => {
-    const text = btn.innerText.toLowerCase();
-    return (
-      (text.includes('签到') || text.includes('checkin') || text.includes('sign in')) &&
-      !btn.disabled &&
-      btn.offsetParent !== null
-    );
-  });
-
-  if (button) {
-    console.log("✅ 找到可用签到按钮，执行点击");
-    button.click();
-  } else {
-    console.log("❌ 未找到可用签到按钮");
-  }
-}
-
-// 使用 MutationObserver 监听 DOM 变化
-const observer = new MutationObserver((mutations) => {
-  console.log("🔍 检测到 DOM 变化，尝试查找按钮");
-  const buttons = [...document.querySelectorAll('button')];
-  const button = buttons.find(btn => {
-    const text = btn.innerText.toLowerCase();
-    return (
-      (text.includes('签到') || text.includes('checkin') || text.includes('sign in')) &&
-      !btn.disabled &&
-      btn.offsetParent !== null
-    );
-  });
-
-  if (button) {
-    console.log("🎯 按钮已出现，准备执行签到");
-    observer.disconnect();
-    forceCheckIn();
-  }
-});
-
-// 监听整个文档的 DOM 变化
-observer.observe(document.body, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  characterData: true
-});
-
-console.log("🔍 启动 DOM 监听，等待签到按钮出现...");
-
-// 初始检查（避免按钮已存在但未被监听捕获）
-setTimeout(() => {
-  const buttons = [...document.querySelectorAll('button')];
-  const button = buttons.find(btn => {
-    const text = btn.innerText.toLowerCase();
-    return (
-      (text.includes('签到') || text.includes('checkin') || text.includes('sign in')) &&
-      !btn.disabled &&
-      btn.offsetParent !== null
-    );
-  });
-
-  if (button) {
-    console.log("⚡ 按钮已存在，直接执行签到");
-    forceCheckIn();
-  }
-}, 1000);
-   
-    // 同时监听 DOMContentLoaded 和 load 事件
-window.addEventListener('DOMContentLoaded', () => {
-  waitForButtonToAppear();
-});
-
-window.addEventListener('load', () => {
-  waitForButtonToAppear();
-});
-  })();
+    console.log('🔍 GLaDOS 自动签到已启动，等待签到按钮...');
+})();

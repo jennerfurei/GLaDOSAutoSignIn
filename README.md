@@ -21,3 +21,20 @@ mac os automatic sign in GLaDos
 	•	点击「+」添加刚刚保存的 Automator 应用
 
 4.测试auto g i t
+
+## 2026-11-16 更新：已迁出本机，改为阿里云服务器定时签到（已废止）
+
+服务器方案因 GLaDOS 接入 Cloudflare Turnstile 人机验证而失效，并于 2026-11-17 从服务器全部移除。
+
+## 2026-11-17 更新：恢复本机方案
+
+- 应用：`~/Applications/AutoSignGlaDOS.app`（AppleScript 版，等价于原 Automator 方案，作用是拉起 Chrome 打开 `https://glados.cloud/console/checkin`）
+- 登录项：系统设置 → 通用 → 登录项与扩展 → 添加 `~/Applications/AutoSignGlaDOS.app`（或终端跑：
+  `osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Users/hanzc/Applications/AutoSignGlaDOS.app", name:"AutoSignGlaDOS", hidden:false}'`）
+- 油猴脚本：`ScriptFile.js` 的 `@match` 已修正为 `glados.cloud`（`.network` 保留兜底），需在 Tampermonkey 里更新已安装的那份
+
+### 自动兑换（2026-11-16 加入）
+
+签到后自动检查积分余额（取自签到返回流水 `list[0].balance`，与页面 UI 同源）：
+余额 ≥ 500 时调 `POST /api/user/exchange {"planType":"plan500"}` 兑换 100 天，成功后飞书推送「兑换成功 + 当前剩余天数」（天数取 `/api/user/status` 的 `leftDays`）；余额不足不做任何处理。
+档位来源为前端硬编码：plan100=100→10天、plan200=200→30天、plan500=500→100天。

@@ -1,0 +1,9 @@
+[Unit]
+Description=GLaDOS auto checkin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/glados-checkin/cookie.env
+ExecStart=/usr/bin/python3 /opt/glados-checkin/glados_checkin.py
